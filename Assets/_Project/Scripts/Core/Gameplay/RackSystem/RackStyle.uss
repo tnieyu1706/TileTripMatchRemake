@@ -1,0 +1,29 @@
+/* Vùng chứa dưới đáy màn hình */
+.rack-container {
+    position: absolute;
+    bottom: 50px;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Nền khay đựng */
+.rack-bg {
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 15px;
+    padding: 10px;
+    flex-direction: row;
+}
+
+/* Các slot vuông chờ chứa gạch */
+.rack-slot {
+    width: 80px;
+    height: 80px;
+    margin-left: 5px;
+    margin-right: 5px;
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    border-width: 3px;
+    border-color: rgba(255, 255, 255, 0.3);
+}
