@@ -12,13 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c32403fcddf94eb4b7cfa009a3409eb6, type: 3}
   m_Name: Level1
   m_EditorClassIdentifier: 
-  layers:
-  - rows:
-    - 111111
-    - 111111
-    - 111111
-  - rows:
-    - 011100
-    - 011100
-    - 001110
-  requiredTriplesToWin: 3
+  tilesNumber: 10
+  layersNumber: 1
+  rackSlots: 6

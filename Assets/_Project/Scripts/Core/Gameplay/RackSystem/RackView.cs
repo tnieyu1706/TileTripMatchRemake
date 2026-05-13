@@ -10,22 +10,34 @@ using LitMotion.Extensions;
 
 namespace Game.Core.Gameplay
 {
-    /// <summary>
-    /// Presentation Handler (View)
-    /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class RackView : MonoBehaviour
     {
         [Header("Settings")] [SerializeField] private float moveSpeed = 25f;
         [SerializeField] private StyleSheet rackStyleSheet;
 
+        [SerializeField]
+        private Vector3 targetTileScaleInRack = new Vector3(1f, 1f, 1f); // Kích thước chuẩn khi nằm trong khay
+
         private UIDocument _uiDocument;
         private VisualElement _rackContainer;
-        private Vector3[] _slotWorldPositions;
-
+        private Vector2[] _slotScreenPositions;
         private RackController _rackController;
 
-        private Dictionary<Tile, MotionHandle> _activeMoveRoutines = new Dictionary<Tile, MotionHandle>();
+        // Custom struct để quản lý cả 2 hiệu ứng Di chuyển và Co giãn cùng lúc
+        private struct TileMotions
+        {
+            public MotionHandle PositionHandle;
+            public MotionHandle ScaleHandle;
+
+            public void CancelAll()
+            {
+                if (PositionHandle.IsActive()) PositionHandle.Cancel();
+                if (ScaleHandle.IsActive()) ScaleHandle.Cancel();
+            }
+        }
+
+        private Dictionary<Tile, TileMotions> _activeMoveRoutines = new Dictionary<Tile, TileMotions>();
 
         [Inject]
         private void Construct(RackController rackController)
@@ -57,10 +69,9 @@ namespace Game.Core.Gameplay
                 _rackController.OnTilesMatched -= HandleTilesMatched;
             }
 
-            // Hủy toàn bộ Motion đang chạy khi object bị tắt (hoặc chuyển Scene) để tránh rò rỉ bộ nhớ & lỗi Reference
             foreach (var handle in _activeMoveRoutines.Values)
             {
-                if (handle.IsActive()) handle.Cancel();
+                handle.CancelAll();
             }
 
             _activeMoveRoutines.Clear();
@@ -68,7 +79,7 @@ namespace Game.Core.Gameplay
 
         private void HandleRackInitialized(int maxSlots)
         {
-            _slotWorldPositions = new Vector3[maxSlots];
+            _slotScreenPositions = new Vector2[maxSlots];
             GenerateUIToolkit(maxSlots);
         }
 
@@ -96,62 +107,71 @@ namespace Game.Core.Gameplay
                 slot.AddToClassList("rack-slot");
 
                 int slotIndex = i;
-                slot.RegisterCallback<GeometryChangedEvent>(evt => UpdateSlotWorldPosition(evt, slotIndex, slot));
+                slot.RegisterCallback<GeometryChangedEvent>(evt => UpdateSlotScreenPosition(evt, slotIndex, slot));
 
                 _rackContainer.Add(slot);
             }
         }
 
-        private void UpdateSlotWorldPosition(GeometryChangedEvent evt, int index, VisualElement slot)
+        private void UpdateSlotScreenPosition(GeometryChangedEvent evt, int index, VisualElement slot)
         {
             var panel = slot.panel;
             if (panel == null) return;
 
-            // Khai báo lại panelPos từ tọa độ bounds của UI slot
             Vector2 panelPos = slot.worldBound.center;
 
             float normalizedX = panelPos.x / panel.visualTree.layout.width;
             float normalizedY = panelPos.y / panel.visualTree.layout.height;
 
-            Vector2 screenPos = new Vector2(
+            _slotScreenPositions[index] = new Vector2(
                 normalizedX * Screen.width,
                 (1f - normalizedY) * Screen.height
             );
-
-            Camera mainCam = Camera.main;
-            if (mainCam != null)
-            {
-                Vector3 worldPos = mainCam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y,
-                    Mathf.Abs(mainCam.transform.position.z)));
-                worldPos.z = 0f;
-                _slotWorldPositions[index] = worldPos;
-            }
         }
 
         private void HandleRackUpdated(IReadOnlyList<Tile> currentTiles)
         {
+            Camera mainCam = Camera.main;
+
             for (int i = 0; i < currentTiles.Count; i++)
             {
                 Tile tile = currentTiles[i];
                 tile.SetSortingOrder(999);
 
-                if (i < _slotWorldPositions.Length)
-                {
-                    Vector3 targetPos = _slotWorldPositions[i];
+                // Quan trọng: Gỡ Tile ra khỏi boardParent để nó không bị dính Scale tổng của màn chơi nữa
+                tile.transform.SetParent(null);
 
-                    if (_activeMoveRoutines.TryGetValue(tile, out MotionHandle activeHandle) && activeHandle.IsActive())
+                if (i < _slotScreenPositions.Length && mainCam != null)
+                {
+                    Vector2 screenPos = _slotScreenPositions[i];
+                    Vector3 targetPos = mainCam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y,
+                        Mathf.Abs(mainCam.transform.position.z)));
+                    targetPos.z = 0f;
+
+                    if (_activeMoveRoutines.TryGetValue(tile, out TileMotions activeHandle))
                     {
-                        activeHandle.Cancel();
+                        activeHandle.CancelAll();
                     }
 
                     float distance = Vector3.Distance(tile.transform.position, targetPos);
                     float duration = Mathf.Clamp(distance / moveSpeed, 0.1f, 0.4f);
 
-                    MotionHandle newHandle = LMotion.Create(tile.transform.position, targetPos, duration)
+                    // 1. Chuyển động vị trí
+                    MotionHandle posHandle = LMotion.Create(tile.transform.position, targetPos, duration)
                         .WithEase(Ease.OutQuad)
                         .BindToPosition(tile.transform);
 
-                    _activeMoveRoutines[tile] = newHandle;
+                    // 2. Chuyển động Scale về kích thước chuẩn (để viên gạch to/nhỏ lại một cách mượt mà khi chui vào khay)
+                    MotionHandle scaleHandle = LMotion
+                        .Create(tile.transform.localScale, targetTileScaleInRack, duration)
+                        .WithEase(Ease.OutQuad)
+                        .BindToLocalScale(tile.transform);
+
+                    _activeMoveRoutines[tile] = new TileMotions
+                    {
+                        PositionHandle = posHandle,
+                        ScaleHandle = scaleHandle
+                    };
                 }
             }
         }
@@ -172,7 +192,6 @@ namespace Game.Core.Gameplay
 
             if (isCanceled) return;
 
-            // Xoá bỏ an toàn: Hủy bỏ Motion đang chạy (nếu có) trước khi Destroy Object
             CancelMotionForTile(t1);
             CancelMotionForTile(t2);
             CancelMotionForTile(t3);
@@ -184,9 +203,9 @@ namespace Game.Core.Gameplay
 
         private void CancelMotionForTile(Tile tile)
         {
-            if (tile != null && _activeMoveRoutines.TryGetValue(tile, out MotionHandle handle))
+            if (tile != null && _activeMoveRoutines.TryGetValue(tile, out TileMotions handle))
             {
-                if (handle.IsActive()) handle.Cancel();
+                handle.CancelAll();
                 _activeMoveRoutines.Remove(tile);
             }
         }
