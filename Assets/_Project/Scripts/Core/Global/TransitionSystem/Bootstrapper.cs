@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace SceneManagement
+namespace Game.Core.Global
 {
     public static class Bootstrapper
     {

@@ -4,13 +4,10 @@ using UnityEngine;
 
 namespace Game.Core.Gameplay
 {
-    /// <summary>
-    /// Pure Logic & Data Handler (Model/Controller)
-    /// </summary>
     public class RackController : MonoBehaviour
     {
-        private int _maxSlots;
-        private List<Tile> _rackTiles = new List<Tile>();
+        private int maxSlots;
+        private readonly List<Tile> rackTiles = new List<Tile>();
 
         public event Action<int> OnRackInitialized;
         public event Action<IReadOnlyList<Tile>> OnRackUpdated;
@@ -19,10 +16,10 @@ namespace Game.Core.Gameplay
 
         public void Initialize(int slotsCount)
         {
-            _maxSlots = slotsCount;
+            maxSlots = slotsCount;
 
-            // [SỬA LỖI]: Phải phá huỷ các GameObject gạch đang nằm trong Rack trước khi xoá Data
-            foreach (var tile in _rackTiles)
+            // ReInitialize rack state
+            foreach (var tile in rackTiles)
             {
                 if (tile != null)
                 {
@@ -30,13 +27,13 @@ namespace Game.Core.Gameplay
                 }
             }
 
-            _rackTiles.Clear();
-            OnRackInitialized?.Invoke(_maxSlots);
+            rackTiles.Clear();
+            OnRackInitialized?.Invoke(maxSlots);
         }
 
         public bool CanAcceptTile()
         {
-            return _rackTiles.Count < _maxSlots;
+            return rackTiles.Count < maxSlots;
         }
 
         public void AddTile(Tile tile)
@@ -46,13 +43,13 @@ namespace Game.Core.Gameplay
             tile.SetState(TileState.InRack);
 
             int insertIndex = GetInsertIndex(tile.IconID);
-            _rackTiles.Insert(insertIndex, tile);
+            rackTiles.Insert(insertIndex, tile);
 
-            OnRackUpdated?.Invoke(_rackTiles);
+            OnRackUpdated?.Invoke(rackTiles);
 
             if (!CheckForMatches())
             {
-                if (_rackTiles.Count >= _maxSlots)
+                if (rackTiles.Count >= maxSlots)
                 {
                     OnRackFull?.Invoke();
                 }
@@ -62,32 +59,32 @@ namespace Game.Core.Gameplay
         private int GetInsertIndex(int iconId)
         {
             int lastIndex = -1;
-            for (int i = 0; i < _rackTiles.Count; i++)
+            for (int i = 0; i < rackTiles.Count; i++)
             {
-                if (_rackTiles[i].IconID == iconId)
+                if (rackTiles[i].IconID == iconId)
                 {
                     lastIndex = i;
                 }
             }
 
-            return lastIndex != -1 ? lastIndex + 1 : _rackTiles.Count;
+            return lastIndex != -1 ? lastIndex + 1 : rackTiles.Count;
         }
 
         private bool CheckForMatches()
         {
-            for (int i = 0; i <= _rackTiles.Count - 3; i++)
+            for (int i = 0; i <= rackTiles.Count - 3; i++)
             {
-                int id = _rackTiles[i].IconID;
-                if (_rackTiles[i + 1].IconID == id && _rackTiles[i + 2].IconID == id)
+                int id = rackTiles[i].IconID;
+                if (rackTiles[i + 1].IconID == id && rackTiles[i + 2].IconID == id)
                 {
-                    Tile t1 = _rackTiles[i];
-                    Tile t2 = _rackTiles[i + 1];
-                    Tile t3 = _rackTiles[i + 2];
+                    Tile t1 = rackTiles[i];
+                    Tile t2 = rackTiles[i + 1];
+                    Tile t3 = rackTiles[i + 2];
 
-                    _rackTiles.RemoveRange(i, 3);
+                    rackTiles.RemoveRange(i, 3);
 
                     OnTilesMatched?.Invoke(t1, t2, t3, id);
-                    OnRackUpdated?.Invoke(_rackTiles);
+                    OnRackUpdated?.Invoke(rackTiles);
 
                     return true;
                 }

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace SceneManagement
+namespace Game.Core.Global
 {
     public class GameLoading : MonoBehaviour
     {

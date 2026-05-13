@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Audio;
 
-namespace _Project.Scripts.Core.Global
+namespace Game.Core.Global
 {
     [RequireComponent(typeof(AudioSource))]
     public class BgmManager : MonoBehaviour

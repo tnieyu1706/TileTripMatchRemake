@@ -41,9 +41,9 @@ namespace Game.Core.Gameplay
 
         public event Action<Tile> OnTileClicked;
 
-        private SfxManager _sfxManager;
-        private MotionHandle _scaleMotion;
-        private Vector3 _originalScale = Vector3.one;
+        private SfxManager sfxManager;
+        private MotionHandle scaleMotion;
+        private Vector3 originalScale = Vector3.one;
 
         // Bỏ Attribute [Inject] ở đây. Nhận SfxManager thông qua hàm Init
         public void Init(int iconId, Sprite iconSprite, Vector3 gridCoord, int layerIndex, SfxManager sfxManager)
@@ -51,12 +51,12 @@ namespace Game.Core.Gameplay
             IconID = iconId;
             iconRenderer.sprite = iconSprite;
             GridCoordinate = gridCoord;
-            _sfxManager = sfxManager;
+            this.sfxManager = sfxManager;
 
             SetSortingOrder(layerIndex * 10);
             SetState(TileState.Exposed);
 
-            _originalScale = transform.localScale;
+            originalScale = transform.localScale;
         }
 
         public void SetState(TileState newState)
@@ -83,7 +83,7 @@ namespace Game.Core.Gameplay
                     iconRenderer.color = exposedColor;
                     tileCollider.enabled = false;
 
-                    PlayScaleAnim(_originalScale, animDuration);
+                    PlayScaleAnim(originalScale, animDuration);
                     break;
             }
         }
@@ -98,7 +98,7 @@ namespace Game.Core.Gameplay
         {
             if (State == TileState.Exposed)
             {
-                PlayScaleAnim(_originalScale * hoverScale, animDuration);
+                PlayScaleAnim(originalScale * hoverScale, animDuration);
             }
         }
 
@@ -106,7 +106,7 @@ namespace Game.Core.Gameplay
         {
             if (State == TileState.Exposed)
             {
-                PlayScaleAnim(_originalScale, animDuration);
+                PlayScaleAnim(originalScale, animDuration);
             }
         }
 
@@ -114,24 +114,24 @@ namespace Game.Core.Gameplay
         {
             if (State == TileState.Exposed)
             {
-                if (tapClip != null && _sfxManager != null) _sfxManager.Play(tapClip, 1f);
-                PlayScaleAnim(_originalScale * tapScale, animDuration * 0.5f);
+                if (tapClip != null && sfxManager != null) sfxManager.Play(tapClip, 1f);
+                PlayScaleAnim(originalScale * tapScale, animDuration * 0.5f);
                 OnTileClicked?.Invoke(this);
             }
         }
 
         private void PlayScaleAnim(Vector3 targetScale, float duration)
         {
-            if (_scaleMotion.IsActive()) _scaleMotion.Cancel();
+            if (scaleMotion.IsActive()) scaleMotion.Cancel();
 
-            _scaleMotion = LMotion.Create(transform.localScale, targetScale, duration)
+            scaleMotion = LMotion.Create(transform.localScale, targetScale, duration)
                 .WithEase(Ease.OutQuad)
                 .BindToLocalScale(transform);
         }
 
         private void OnDisable()
         {
-            if (_scaleMotion.IsActive()) _scaleMotion.Cancel();
+            if (scaleMotion.IsActive()) scaleMotion.Cancel();
         }
     }
 }

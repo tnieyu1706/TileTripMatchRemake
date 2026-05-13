@@ -11,27 +11,29 @@ namespace Game.Core.Gameplay
         [SerializeField] private GameObject losePanel;
 
         [Header("Buttons")] [SerializeField] private Button btnNextLevel;
-        [SerializeField] private List<Button> btnRestarts; // Đã chuyển thành List
+        [SerializeField] private List<Button> btnRestarts;
         [SerializeField] private Button btnHome;
 
-        private GameManager _gameManager;
+        private GameManager gameManager;
 
         [Inject]
-        private void Construct(GameManager gameManager)
+        private void Construct(GameManager gameManagerSource)
         {
-            _gameManager = gameManager;
+            this.gameManager = gameManagerSource;
         }
 
         private void Awake()
         {
-            // Ẩn các menu khi mới vào game
+            // Hide panels at the start
             winPanel.SetActive(false);
             losePanel.SetActive(false);
         }
 
+        #region Events
+
         private void OnEnable()
         {
-            // Đăng ký sự kiện click cho các Buttons
+            // Register events
             btnNextLevel.onClick.AddListener(OnNextLevelClicked);
 
             foreach (var btn in btnRestarts)
@@ -41,10 +43,10 @@ namespace Game.Core.Gameplay
 
             btnHome.onClick.AddListener(OnHomeClicked);
 
-            if (_gameManager != null)
+            if (gameManager != null)
             {
-                _gameManager.OnLevelWon += ShowWinMenu;
-                _gameManager.OnLevelLost += ShowLoseMenu;
+                gameManager.OnLevelWon += ShowWinMenu;
+                gameManager.OnLevelLost += ShowLoseMenu;
             }
         }
 
@@ -59,10 +61,10 @@ namespace Game.Core.Gameplay
 
             btnHome.onClick.RemoveListener(OnHomeClicked);
 
-            if (_gameManager != null)
+            if (gameManager != null)
             {
-                _gameManager.OnLevelWon -= ShowWinMenu;
-                _gameManager.OnLevelLost -= ShowLoseMenu;
+                gameManager.OnLevelWon -= ShowWinMenu;
+                gameManager.OnLevelLost -= ShowLoseMenu;
             }
         }
 
@@ -79,22 +81,24 @@ namespace Game.Core.Gameplay
         private void OnNextLevelClicked()
         {
             winPanel.SetActive(false);
-            _gameManager.LoadNextLevel();
+            gameManager.LoadNextLevel();
         }
 
         private void OnRestartClicked()
         {
             losePanel.SetActive(false);
-            _gameManager.RestartCurrentLevel();
+            gameManager.RestartCurrentLevel();
         }
 
         private void OnHomeClicked()
         {
-            // Ẩn panel nếu đang hiển thị
+            // Hide current display panel
             winPanel.SetActive(false);
             losePanel.SetActive(false);
 
-            _gameManager.ReturnToHomeScene();
+            gameManager.ReturnToHomeScene();
         }
+
+        #endregion
     }
 }

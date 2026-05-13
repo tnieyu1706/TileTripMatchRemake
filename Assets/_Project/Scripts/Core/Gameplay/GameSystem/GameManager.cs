@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Reflex.Attributes;
 using Game.Core.Data;
-using SceneManagement; // Thư viện Scene Management của bạn
+using Game.Core.Global;
 
 namespace Game.Core.Gameplay
 {
@@ -13,110 +13,104 @@ namespace Game.Core.Gameplay
         private List<LevelDataSo> levelList;
 
         [Header("Scene Management")] [SerializeField]
-        private SceneGroup homeSceneGroup; // Dùng SceneGroup thay cho chuỗi text
+        private SceneGroup homeSceneGroup;
 
-        private BoardController _boardController;
-        private RackController _rackController;
-        private PlayerDataSoap _playerData;
+        private BoardController boardController;
+        private RackController rackController;
+        private PlayerDataSoap playerData;
 
-        private int _currentLevelIndex = 0;
+        private int currentLevelIndex = 0;
 
-        // Events cho UI (GameplayMenuGUI) lắng nghe
         public event Action OnLevelWon;
         public event Action OnLevelLost;
 
         [Inject]
-        private void Construct(BoardController boardController, RackController rackController,
-            PlayerDataSoap playerData)
+        private void Construct(
+            BoardController boardControllerSource,
+            RackController rackControllerSource,
+            PlayerDataSoap playerDataSource
+        )
         {
-            _boardController = boardController;
-            _rackController = rackController;
-            _playerData = playerData;
+            this.boardController = boardControllerSource;
+            this.rackController = rackControllerSource;
+            this.playerData = playerDataSource;
         }
 
         private void Start()
         {
-            // Đăng ký sự kiện từ các Core Systems
-            _boardController.OnBoardCleared += HandleWinCondition;
-            _rackController.OnRackFull += HandleLoseCondition;
+            boardController.OnBoardCleared += HandleWinCondition;
+            rackController.OnRackFull += HandleLoseCondition;
 
-            // Tự động load level hiện tại khi vừa vào Gameplay Scene
-            if (levelList != null && levelList.Count > 0)
+            if (levelList is { Count: > 0 })
             {
-                // Lấy level từ Data (bảo vệ tránh out of range nếu xoá bớt level)
-                _currentLevelIndex = Mathf.Clamp(_playerData.CurrentLevelIndex, 0, levelList.Count - 1);
-                LoadLevelByIndex(_currentLevelIndex);
+                currentLevelIndex = Mathf.Clamp(playerData.CurrentLevelIndex, 0, levelList.Count - 1);
+                LoadLevelByIndex(currentLevelIndex);
             }
             else
             {
-                Debug.LogError("[GameManager] Chưa có LevelDataSo nào trong levelList!");
+                Debug.LogError("[GameManager] levelList is empty!");
             }
         }
 
         private void OnDestroy()
         {
-            if (_boardController != null)
-                _boardController.OnBoardCleared -= HandleWinCondition;
+            if (boardController != null)
+                boardController.OnBoardCleared -= HandleWinCondition;
 
-            if (_rackController != null)
-                _rackController.OnRackFull -= HandleLoseCondition;
+            if (rackController != null)
+                rackController.OnRackFull -= HandleLoseCondition;
         }
 
         public void LoadLevelByIndex(int index)
         {
             if (index < 0 || index >= levelList.Count) return;
 
-            _currentLevelIndex = index;
-            // Quăng Data cho BoardController, phần còn lại Board tự lo
-            _boardController.InitializeBoard(levelList[_currentLevelIndex]);
+            currentLevelIndex = index;
+            boardController.InitializeBoard(levelList[currentLevelIndex]);
         }
 
         public void RestartCurrentLevel()
         {
-            // Restart level hiện tại không cần Load lại Scene, 
-            // chỉ cần xoá Board cũ và setup Board mới -> Cực kỳ tối ưu!
-            LoadLevelByIndex(_currentLevelIndex);
+            // Fast restart without reloading the entire scene
+            LoadLevelByIndex(currentLevelIndex);
         }
 
         public void LoadNextLevel()
         {
-            _currentLevelIndex++;
+            currentLevelIndex++;
 
-            if (_currentLevelIndex < levelList.Count)
+            if (currentLevelIndex < levelList.Count)
             {
-                // Lưu lại mốc level mới vào PlayerPrefs (thông qua SOAP)
-                _playerData.SetLevel(_currentLevelIndex);
-                LoadLevelByIndex(_currentLevelIndex);
+                playerData.SetLevel(currentLevelIndex);
+                LoadLevelByIndex(currentLevelIndex);
             }
             else
             {
-                Debug.Log("Chúc mừng! Bạn đã hoàn thành toàn bộ Levels.");
+                Debug.Log("[GameManager] All levels completed!");
                 ReturnToHomeScene();
             }
         }
 
         public void ReturnToHomeScene()
         {
-            // Sử dụng SceneLoader và SceneGroup để chuyển về Home kèm Fade Out mượt mà
             if (homeSceneGroup != null)
             {
                 SceneLoader.Instance.Load(homeSceneGroup);
             }
             else
             {
-                Debug.LogError(
-                    "[GameManager] Chưa gán homeSceneGroup! Vui lòng kéo thả file SceneGroup vào Inspector.");
+                Debug.LogError("[GameManager] homeSceneGroup is missing. Please assign it in the Inspector.");
             }
         }
 
         private void HandleWinCondition()
         {
-            OnLevelWon?.Invoke(); // Bắn event để WinPanel hiện lên
+            OnLevelWon?.Invoke();
         }
 
         private void HandleLoseCondition()
         {
-            OnLevelLost?.Invoke(); // Bắn event để LosePanel hiện lên
+            OnLevelLost?.Invoke();
         }
     }
 }

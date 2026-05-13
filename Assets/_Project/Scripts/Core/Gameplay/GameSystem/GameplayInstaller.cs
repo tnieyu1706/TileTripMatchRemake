@@ -1,6 +1,5 @@
-using UnityEngine;
 using Reflex.Core;
-using Game.Core.Data;
+using UnityEngine;
 
 namespace Game.Core.Gameplay
 {
@@ -12,7 +11,8 @@ namespace Game.Core.Gameplay
         [SerializeField] private RackController rackController;
         [SerializeField] private GameManager gameManager;
 
-        [Header("Managers")] [SerializeField] private SfxManager sfxManager; // Khai báo SfxManager
+        [Header("Managers")] 
+        [SerializeField] private SfxManager sfxManager;
 
         public void InstallBindings(ContainerBuilder builder)
         {
@@ -20,15 +20,7 @@ namespace Game.Core.Gameplay
             builder.RegisterValue(rackController);
             builder.RegisterValue(gameManager);
 
-            // Đăng ký SfxManager vào DI Container
-            if (sfxManager != null)
-            {
-                builder.RegisterValue(sfxManager);
-            }
-            else
-            {
-                Debug.LogWarning("Chưa gán SfxManager vào GameplayInstaller!");
-            }
+            builder.RegisterValue(sfxManager);
         }
     }
 }

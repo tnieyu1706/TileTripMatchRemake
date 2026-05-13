@@ -15,23 +15,23 @@ namespace Game.Core.Gameplay
 
         [Header("Data")] [SerializeField] private Sprite[] availableIcons;
 
-        private RackController _rackController;
-        private SfxManager _sfxManager; // Khai báo thêm biến để hứng SfxManager từ DI
-        private List<Tile> activeTiles = new List<Tile>();
+        private RackController rackController;
+        private SfxManager sfxManager;
+        private readonly List<Tile> activeTiles = new List<Tile>();
         public event Action OnBoardCleared;
 
         [Inject]
-        private void Construct(RackController rackController, SfxManager sfxManager)
+        private void Construct(RackController rackControllerSource, SfxManager sfxManagerSource)
         {
-            _rackController = rackController;
-            _sfxManager = sfxManager;
+            this.rackController = rackControllerSource;
+            this.sfxManager = sfxManagerSource;
         }
 
         public void InitializeBoard(LevelDataSo levelData)
         {
             ClearBoard();
 
-            _rackController.Initialize(levelData.rackSlots);
+            rackController.Initialize(levelData.rackSlots);
 
             List<Vector3> allPositions =
                 BoardGenerator.GeneratePositions(levelData.tilesNumber, levelData.layersNumber);
@@ -45,8 +45,7 @@ namespace Game.Core.Gameplay
                 Tile newTile = Instantiate(tilePrefab, allPositions[i], Quaternion.identity, boardParent);
                 Sprite iconSprite = availableIcons[assignedIcons[i]];
 
-                // [MỚI] Truyền sfxManager từ BoardController thẳng vào từng Tile ở đây
-                newTile.Init(assignedIcons[i], iconSprite, allPositions[i], (int)allPositions[i].z, _sfxManager);
+                newTile.Init(assignedIcons[i], iconSprite, allPositions[i], (int)allPositions[i].z, sfxManager);
                 newTile.OnTileClicked += HandleTileClicked;
 
                 activeTiles.Add(newTile);
@@ -103,7 +102,7 @@ namespace Game.Core.Gameplay
                 else
                 {
                     Debug.LogWarning(
-                        "Map có thiết kế quá hẹp, thuật toán fallback được kích hoạt. Đang gán ngẫu nhiên theo nhóm 3...");
+                        "Using Fallback algorithm for icon assignment due to insufficient exposed tiles. This may lead to less optimal distributions.");
 
                     List<int> remainingIndices = new List<int>();
                     for (int i = 0; i < totalTiles; i++)
@@ -162,12 +161,12 @@ namespace Game.Core.Gameplay
 
         private void HandleTileClicked(Tile clickedTile)
         {
-            if (!_rackController.CanAcceptTile()) return;
+            if (!rackController.CanAcceptTile()) return;
 
             clickedTile.OnTileClicked -= HandleTileClicked;
             activeTiles.Remove(clickedTile);
 
-            _rackController.AddTile(clickedTile);
+            rackController.AddTile(clickedTile);
 
             UpdateTilesState();
 
