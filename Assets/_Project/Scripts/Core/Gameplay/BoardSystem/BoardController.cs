@@ -53,9 +53,18 @@ namespace Game.Core.Gameplay
 
             UpdateTilesState();
         }
-
+        
+        /// <summary>
+        /// Generates icon groups using a lightweight solvability-driven approach.
+        /// The algorithm repeatedly finds currently exposed tiles and assigns them
+        /// into matchable groups of three, simulating the natural gameplay progression
+        /// where top tiles are cleared first and deeper tiles become exposed over time.
+        /// </summary>
+        /// <param name="positions">list position has initialized</param>
+        /// <returns>list IconIds respectively with Positions</returns>
         private int[] GenerateSolvableIconDistribution(List<Vector3> positions)
         {
+            // Current positions sort (low -> high) & (facing outward)
             int totalTiles = positions.Count;
             int[] assignedIconIds = new int[totalTiles];
             bool[] isAssigned = new bool[totalTiles];
@@ -63,6 +72,7 @@ namespace Game.Core.Gameplay
             int assignedCount = 0;
             while (assignedCount < totalTiles)
             {
+                // Identify exposed tiles (with perspective like Player)
                 List<int> exposedIndices = new List<int>();
 
                 for (int i = 0; i < totalTiles; i++)
@@ -87,6 +97,7 @@ namespace Game.Core.Gameplay
                     }
                 }
 
+                // Select random 3 tiles in format exposed (format) -> assign.
                 if (exposedIndices.Count >= 3)
                 {
                     exposedIndices = exposedIndices.OrderBy(x => UnityEngine.Random.value).Take(3).ToList();
@@ -99,6 +110,7 @@ namespace Game.Core.Gameplay
                         assignedCount++;
                     }
                 }
+                // If less than 3 exposed tiles remain, assign randomly to any unassigned tiles (fallback)
                 else
                 {
                     Debug.LogWarning(
