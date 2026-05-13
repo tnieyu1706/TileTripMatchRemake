@@ -16,13 +16,15 @@ namespace Game.Core.Gameplay
         [Header("Data")] [SerializeField] private Sprite[] availableIcons;
 
         private RackController _rackController;
+        private SfxManager _sfxManager; // Khai báo thêm biến để hứng SfxManager từ DI
         private List<Tile> activeTiles = new List<Tile>();
         public event Action OnBoardCleared;
 
         [Inject]
-        private void Construct(RackController rackController)
+        private void Construct(RackController rackController, SfxManager sfxManager)
         {
             _rackController = rackController;
+            _sfxManager = sfxManager;
         }
 
         public void InitializeBoard(LevelDataSo levelData)
@@ -31,22 +33,20 @@ namespace Game.Core.Gameplay
 
             _rackController.Initialize(levelData.rackSlots);
 
-            // 1. Sinh toạ độ gạch tự động thông qua BFS Generator
             List<Vector3> allPositions =
                 BoardGenerator.GeneratePositions(levelData.tilesNumber, levelData.layersNumber);
 
             if (allPositions.Count == 0) return;
 
-            // 2. Phân bổ Icon theo thuật toán Chơi ngược (Bảo đảm giải được)
             int[] assignedIcons = GenerateSolvableIconDistribution(allPositions);
 
-            // 3. Sinh object thực tế
             for (int i = 0; i < allPositions.Count; i++)
             {
                 Tile newTile = Instantiate(tilePrefab, allPositions[i], Quaternion.identity, boardParent);
                 Sprite iconSprite = availableIcons[assignedIcons[i]];
 
-                newTile.Init(assignedIcons[i], iconSprite, allPositions[i], (int)allPositions[i].z);
+                // [MỚI] Truyền sfxManager từ BoardController thẳng vào từng Tile ở đây
+                newTile.Init(assignedIcons[i], iconSprite, allPositions[i], (int)allPositions[i].z, _sfxManager);
                 newTile.OnTileClicked += HandleTileClicked;
 
                 activeTiles.Add(newTile);
@@ -105,25 +105,17 @@ namespace Game.Core.Gameplay
                     Debug.LogWarning(
                         "Map có thiết kế quá hẹp, thuật toán fallback được kích hoạt. Đang gán ngẫu nhiên theo nhóm 3...");
 
-                    // Gom tất cả các index chưa được gán lại
                     List<int> remainingIndices = new List<int>();
                     for (int i = 0; i < totalTiles; i++)
                     {
-                        if (!isAssigned[i])
-                        {
-                            remainingIndices.Add(i);
-                        }
+                        if (!isAssigned[i]) remainingIndices.Add(i);
                     }
 
-                    // Xáo trộn nhẹ để kết quả ngẫu nhiên, tránh việc các viên gần nhau luôn giống nhau
                     remainingIndices = remainingIndices.OrderBy(x => UnityEngine.Random.value).ToList();
 
-                    // Gán icon theo từng cụm 3 viên
                     for (int i = 0; i < remainingIndices.Count; i += 3)
                     {
                         int randomIconId = UnityEngine.Random.Range(0, availableIcons.Length);
-
-                        // Lặp tối đa 3 lần để gán đủ bộ 3 cho Icon vừa bốc
                         for (int j = 0; j < 3 && (i + j) < remainingIndices.Count; j++)
                         {
                             int index = remainingIndices[i + j];

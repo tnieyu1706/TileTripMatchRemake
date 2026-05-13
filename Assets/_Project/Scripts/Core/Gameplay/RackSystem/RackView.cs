@@ -13,15 +13,18 @@ namespace Game.Core.Gameplay
     [RequireComponent(typeof(UIDocument))]
     public class RackView : MonoBehaviour
     {
-        [Header("Settings")] [SerializeField] private float moveSpeed = 35f; // Tăng tốc nhẹ để cảm giác click "ăn" ngay
+        [Header("Settings")] [SerializeField] private float moveSpeed = 35f;
         [SerializeField] private StyleSheet rackStyleSheet;
-
         [SerializeField] private Vector3 targetTileScaleInRack = new Vector3(1f, 1f, 1f);
+
+        [Header("Audio")] [SerializeField] private AudioClip matchClip;
 
         private UIDocument _uiDocument;
         private VisualElement _rackContainer;
         private Vector2[] _slotScreenPositions;
+
         private RackController _rackController;
+        private SfxManager _sfxManager;
 
         private struct TileMotions
         {
@@ -36,14 +39,13 @@ namespace Game.Core.Gameplay
         }
 
         private Dictionary<Tile, TileMotions> _activeMoveRoutines = new Dictionary<Tile, TileMotions>();
-
-        // [MỚI] Hàng đợi Visual độc lập: Giải quyết độ trễ và quản lý vị trí ảo khi gạch nổ
         private List<Tile> _visualSlots = new List<Tile>();
 
         [Inject]
-        private void Construct(RackController rackController)
+        private void Construct(RackController rackController, SfxManager sfxManager)
         {
             _rackController = rackController;
+            _sfxManager = sfxManager;
         }
 
         private void Awake()
@@ -122,7 +124,6 @@ namespace Game.Core.Gameplay
             if (panel == null) return;
 
             Vector2 panelPos = slot.worldBound.center;
-
             float normalizedX = panelPos.x / panel.visualTree.layout.width;
             float normalizedY = panelPos.y / panel.visualTree.layout.height;
 
@@ -137,7 +138,6 @@ namespace Game.Core.Gameplay
             Camera mainCam = Camera.main;
             if (mainCam == null) return;
 
-            // 1. Phân loại các Tile mới được bấm và gom nhóm chúng vào Visual Slots ngay lập tức
             foreach (var tile in currentTiles)
             {
                 if (!_visualSlots.Contains(tile))
@@ -150,7 +150,6 @@ namespace Game.Core.Gameplay
                 }
             }
 
-            // 2. Cập nhật quỹ đạo bay cho TOÀN BỘ gạch trong khay
             UpdateAllVisualTilePositions(mainCam);
         }
 
@@ -171,7 +170,6 @@ namespace Game.Core.Gameplay
             {
                 Tile tile = _visualSlots[i];
 
-                // CHỐNG GHI ĐÈ: Không lôi các Tile đang diễn hoạt ảnh nổ (Matched) đi chỗ khác
                 if (tile.State == TileState.Matched) continue;
 
                 Vector3 targetPos = GetWorldPositionForSlot(i, mainCam);
@@ -210,19 +208,17 @@ namespace Game.Core.Gameplay
             }
             else
             {
-                // [MỚI] TRÀN RA NGOÀI (Overflow logic): Tính toán tọa độ của slot ảo nội suy về bên phải
                 if (_slotScreenPositions.Length >= 2)
                 {
                     Vector2 lastPos = _slotScreenPositions[_slotScreenPositions.Length - 1];
                     Vector2 secondLast = _slotScreenPositions[_slotScreenPositions.Length - 2];
-                    Vector2 dir = lastPos - secondLast; // Vectơ khoảng cách giữa 2 slot
+                    Vector2 dir = lastPos - secondLast;
 
-                    // Nhân vectơ khoảng cách lên để tìm ra vị trí của Slot thứ 8, 9...
                     screenPos = lastPos + dir * (index - _slotScreenPositions.Length + 1);
                 }
                 else
                 {
-                    screenPos = _slotScreenPositions[0]; // Fallback an toàn
+                    screenPos = _slotScreenPositions[0];
                 }
             }
 
@@ -235,6 +231,9 @@ namespace Game.Core.Gameplay
 
         private void HandleTilesMatched(Tile t1, Tile t2, Tile t3, int iconId)
         {
+            // [MỚI] Phát âm thanh khi ghép cặp 3 viên gạch!
+            if (matchClip != null && _sfxManager != null) _sfxManager.Play(matchClip, 1f);
+
             ProcessMatchTask(t1, t2, t3, this.GetCancellationTokenOnDestroy()).Forget();
         }
 
@@ -244,7 +243,6 @@ namespace Game.Core.Gameplay
             t2.SetState(TileState.Matched);
             t3.SetState(TileState.Matched);
 
-            // 1. Chờ các viên gạch bay tới khay hoàn toàn (Delay 1 xíu để tụm lại thành 3 viên)
             bool isCanceled = await UniTask.Delay(TimeSpan.FromSeconds(0.2f), cancellationToken: cancellationToken)
                 .SuppressCancellationThrow();
 
@@ -254,7 +252,6 @@ namespace Game.Core.Gameplay
             CancelMotionForTile(t2);
             CancelMotionForTile(t3);
 
-            // 2. Chạy hoạt ảnh Pop
             float popDuration = 0.25f;
             var t1Task = PlayPopAnimationAsync(t1, popDuration, cancellationToken);
             var t2Task = PlayPopAnimationAsync(t2, popDuration, cancellationToken);
@@ -264,7 +261,6 @@ namespace Game.Core.Gameplay
 
             if (cancellationToken.IsCancellationRequested) return;
 
-            // 3. Xóa gạch khỏi hàng đợi Visual SAU KHI NỔ XONG
             _visualSlots.Remove(t1);
             _visualSlots.Remove(t2);
             _visualSlots.Remove(t3);
@@ -273,7 +269,6 @@ namespace Game.Core.Gameplay
             if (t2 != null) Destroy(t2.gameObject);
             if (t3 != null) Destroy(t3.gameObject);
 
-            // 4. Thu gọn khay: Kéo các viên gạch nằm ở vị trí tràn viền dồn lên trước
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
@@ -287,7 +282,6 @@ namespace Game.Core.Gameplay
 
             try
             {
-                // Nửa đầu: Phóng to
                 await LMotion.Create(tile.transform.localScale, targetTileScaleInRack * 1.25f, duration * 0.5f)
                     .WithEase(Ease.OutQuad)
                     .BindToLocalScale(tile.transform)
@@ -295,7 +289,6 @@ namespace Game.Core.Gameplay
 
                 if (tile == null) return;
 
-                // Nửa sau: Thu nhỏ biến mất
                 await LMotion.Create(tile.transform.localScale, Vector3.zero, duration * 0.5f)
                     .WithEase(Ease.InBack)
                     .BindToLocalScale(tile.transform)
@@ -303,7 +296,6 @@ namespace Game.Core.Gameplay
             }
             catch (OperationCanceledException)
             {
-                // Bỏ qua lỗi ngắt Task an toàn
             }
         }
 

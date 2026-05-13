@@ -28,10 +28,12 @@ namespace Game.Core.Gameplay
         [SerializeField] private Color exposedColor = Color.white;
 
         [Header("Animation Settings")] [SerializeField]
-        private float hoverScale = 1.05f; // To lên 5% khi rê chuột
+        private float hoverScale = 1.05f;
 
-        [SerializeField] private float clickScale = 0.9f; // Lõm xuống 10% khi click
+        [SerializeField] private float tapScale = 0.9f;
         [SerializeField] private float animDuration = 0.15f;
+
+        [Header("Audio")] [SerializeField] private AudioClip tapClip;
 
         public int IconID { get; private set; }
         public Vector3 GridCoordinate { get; private set; }
@@ -39,14 +41,17 @@ namespace Game.Core.Gameplay
 
         public event Action<Tile> OnTileClicked;
 
+        private SfxManager _sfxManager;
         private MotionHandle _scaleMotion;
         private Vector3 _originalScale = Vector3.one;
 
-        public void Init(int iconId, Sprite iconSprite, Vector3 gridCoord, int layerIndex)
+        // Bỏ Attribute [Inject] ở đây. Nhận SfxManager thông qua hàm Init
+        public void Init(int iconId, Sprite iconSprite, Vector3 gridCoord, int layerIndex, SfxManager sfxManager)
         {
             IconID = iconId;
             iconRenderer.sprite = iconSprite;
             GridCoordinate = gridCoord;
+            _sfxManager = sfxManager;
 
             SetSortingOrder(layerIndex * 10);
             SetState(TileState.Exposed);
@@ -78,7 +83,6 @@ namespace Game.Core.Gameplay
                     iconRenderer.color = exposedColor;
                     tileCollider.enabled = false;
 
-                    // Phục hồi kích thước khi rời khỏi bàn
                     PlayScaleAnim(_originalScale, animDuration);
                     break;
             }
@@ -94,7 +98,6 @@ namespace Game.Core.Gameplay
         {
             if (State == TileState.Exposed)
             {
-                // TODO: Gọi SFX Hover nhẹ nhàng ở đây nếu muốn
                 PlayScaleAnim(_originalScale * hoverScale, animDuration);
             }
         }
@@ -111,8 +114,8 @@ namespace Game.Core.Gameplay
         {
             if (State == TileState.Exposed)
             {
-                // TODO: Gọi SFX Click gạch rộp rộp ở đây
-                PlayScaleAnim(_originalScale * clickScale, animDuration * 0.5f);
+                if (tapClip != null && _sfxManager != null) _sfxManager.Play(tapClip, 1f);
+                PlayScaleAnim(_originalScale * tapScale, animDuration * 0.5f);
                 OnTileClicked?.Invoke(this);
             }
         }

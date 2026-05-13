@@ -707,6 +707,7 @@ MonoBehaviour:
   boardController: {fileID: 1335879711}
   rackController: {fileID: 158530061}
   gameManager: {fileID: 674893111}
+  sfxManager: {fileID: 932074660}
   playerData: {fileID: 11400000, guid: 79a19936b370b09409154ae5a031e0bb, type: 2}
 --- !u!114 &451767130
 MonoBehaviour:
@@ -1095,6 +1096,14 @@ MonoBehaviour:
   levelList:
   - {fileID: 11400000, guid: 9500a925b171b5745bc5a0725767a323, type: 2}
   - {fileID: 11400000, guid: 3af9344bf5ff5204dba5a8de90658760, type: 2}
+  - {fileID: 11400000, guid: e54def811423f5045a249a2b561aaed2, type: 2}
+  - {fileID: 11400000, guid: d43865f648cb0da40b2b31f1d2c94d62, type: 2}
+  - {fileID: 11400000, guid: c665be1129acfae4ea80d76aed5ac55b, type: 2}
+  - {fileID: 11400000, guid: cdeaf03cf27f6dd498cfba6caea26ae7, type: 2}
+  - {fileID: 11400000, guid: dea93fa4a1ec96d4cbfe30725c480f43, type: 2}
+  - {fileID: 11400000, guid: 0d7c88e61cfb82b4da624a52e562ea95, type: 2}
+  - {fileID: 11400000, guid: 79699558c4bb8a0429cfa48b1e1959fa, type: 2}
+  - {fileID: 11400000, guid: 326386e61dd14dd42a9c5d8cb9ea9c0e, type: 2}
 --- !u!4 &674893112
 Transform:
   m_ObjectHideFlags: 0
@@ -1529,6 +1538,54 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &932074659
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 932074661}
+  - component: {fileID: 932074660}
+  m_Layer: 0
+  m_Name: SfxManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &932074660
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 932074659}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c71a82d447d46f9b70703f6b0f7f4dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  audioSourcePrefab: {fileID: 8260889268850048600, guid: 598afaa258f6cf4499d5e67ea6f0f923, type: 3}
+  defaultCapacity: 10
+  maxSize: 30
+  pitchRange: {x: 0.9, y: 1.1}
+--- !u!4 &932074661
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 932074659}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1258853245
 GameObject:
   m_ObjectHideFlags: 0
@@ -1641,6 +1698,7 @@ MonoBehaviour:
   moveSpeed: 25
   rackStyleSheet: {fileID: 7433441132597879392, guid: 43e8bbd8d77b421c97c803967fcbca74, type: 3}
   targetTileScaleInRack: {x: 1, y: 1, z: 1}
+  matchClip: {fileID: 8300000, guid: c56c3698d71ab3343aa6cb326017f0b2, type: 3}
 --- !u!114 &1310882083
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2935,6 +2993,7 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 1509692611}
+  - {fileID: 932074661}
   - {fileID: 674893112}
   - {fileID: 1335879712}
   - {fileID: 158530062}

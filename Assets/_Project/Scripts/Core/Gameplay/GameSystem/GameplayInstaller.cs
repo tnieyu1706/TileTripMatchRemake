@@ -1,6 +1,6 @@
 using UnityEngine;
 using Reflex.Core;
-using Game.Core.Data; // Import namespace cho PlayerDataSoap
+using Game.Core.Data;
 
 namespace Game.Core.Gameplay
 {
@@ -12,6 +12,8 @@ namespace Game.Core.Gameplay
         [SerializeField] private RackController rackController;
         [SerializeField] private GameManager gameManager;
 
+        [Header("Managers")] [SerializeField] private SfxManager sfxManager; // Khai báo SfxManager
+
         [Header("Data (SOAP)")] [SerializeField]
         private PlayerDataSoap playerData;
 
@@ -21,7 +23,16 @@ namespace Game.Core.Gameplay
             builder.RegisterValue(rackController);
             builder.RegisterValue(gameManager);
 
-            // Bind SOAP Data vào DI Container
+            // Đăng ký SfxManager vào DI Container
+            if (sfxManager != null)
+            {
+                builder.RegisterValue(sfxManager);
+            }
+            else
+            {
+                Debug.LogWarning("Chưa gán SfxManager vào GameplayInstaller!");
+            }
+
             if (playerData != null)
             {
                 builder.RegisterValue(playerData);
