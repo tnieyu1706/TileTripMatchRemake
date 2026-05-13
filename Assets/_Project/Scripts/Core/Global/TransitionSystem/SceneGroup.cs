@@ -4,7 +4,7 @@ using System.Linq;
 using Eflatun.SceneReference;
 using UnityEngine;
 
-namespace SceneManagement
+namespace Game.Core.Global
 {
     [CreateAssetMenu(fileName = "SceneGroup", menuName = "SceneManagement/SceneGroup")]
     public class SceneGroup : ScriptableObject

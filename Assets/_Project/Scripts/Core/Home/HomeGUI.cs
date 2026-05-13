@@ -1,9 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // Sử dụng TextMeshPro cho UI Text
+using TMPro;
 using Reflex.Attributes;
 using Game.Core.Data;
-using SceneManagement;
+using Game.Core.Global;
 
 namespace Game.Core.Home
 {
@@ -15,14 +15,14 @@ namespace Game.Core.Home
         [SerializeField] private TextMeshProUGUI levelText;
 
         [Header("Scene Management")] [SerializeField]
-        private SceneGroup gameplaySceneGroup; // Kéo thả SceneGroup của Gameplay vào đây
+        private SceneGroup gameplaySceneGroup;
 
-        private PlayerDataSoap _playerData;
+        private PlayerDataSoap playerData;
 
         [Inject]
-        private void Construct(PlayerDataSoap playerData)
+        private void Construct(PlayerDataSoap playerDataSource)
         {
-            _playerData = playerData;
+            this.playerData = playerDataSource;
         }
 
         private void OnEnable()
@@ -32,7 +32,6 @@ namespace Game.Core.Home
                 playButton.onClick.AddListener(OnPlayButtonClicked);
             }
 
-            // Luôn đồng bộ dữ liệu Level mới nhất mỗi khi màn hình Home hiển thị lên
             UpdateLevelText();
         }
 
@@ -46,15 +45,14 @@ namespace Game.Core.Home
 
         private void UpdateLevelText()
         {
-            if (_playerData != null && levelText != null)
+            if (playerData != null && levelText != null)
             {
-                // Cộng 1 vì CurrentLevelIndex thường bắt đầu từ 0 trong logic hệ thống
-                int displayLevel = _playerData.CurrentLevelIndex + 1;
+                int displayLevel = playerData.CurrentLevelIndex + 1;
                 levelText.text = $"Level {displayLevel}";
             }
             else
             {
-                Debug.LogWarning("[HomeGUI] Thiếu tham chiếu PlayerData hoặc LevelText chưa được gán!");
+                Debug.LogWarning("[HomeGUI] Cannot update level text when player data is null");
             }
         }
 
@@ -62,15 +60,13 @@ namespace Game.Core.Home
         {
             if (gameplaySceneGroup == null)
             {
-                Debug.LogError("[HomeGUI] Chưa gán Gameplay Scene Group!");
+                Debug.LogWarning("[HomeGUI] No gameplay scene selected");
                 return;
             }
 
-            // Vô hiệu hóa nút để tránh người chơi spam click 
-            // trong lúc Animation Fade Out đang chạy
             playButton.interactable = false;
 
-            // Chuyển Scene thông qua hệ thống SceneLoader của bạn
+            // Transition gameplay scene
             SceneLoader.Instance.Load(gameplaySceneGroup);
         }
     }

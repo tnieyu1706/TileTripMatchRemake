@@ -2,7 +2,7 @@ using Game.Core.Data;
 using Reflex.Core;
 using UnityEngine;
 
-namespace _Project.Scripts.Core.Global
+namespace Game.Core.Global
 {
     public class GlobalInstaller : MonoBehaviour, IInstaller
     {

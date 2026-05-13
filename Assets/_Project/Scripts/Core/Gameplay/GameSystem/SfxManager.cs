@@ -1,20 +1,15 @@
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Pool;
-using Reflex.Attributes;
-using Cysharp.Threading.Tasks;
 using Random = UnityEngine.Random;
 
 namespace Game.Core.Gameplay
 {
-    /// <summary>
-    /// Hệ thống quản lý Âm thanh (chỉ dành riêng cho SFX) sử dụng Object Pool và UniTask.
-    /// Vòng đời gắn liền với Scene hiện tại.
-    /// </summary>
     public class SfxManager : MonoBehaviour
     {
         [Header("SFX Pool Settings")] [SerializeField]
-        private AudioSource audioSourcePrefab; // [MỚI] Sử dụng Prefab để dễ dàng setup AudioMixer
+        private AudioSource audioSourcePrefab;
 
         [SerializeField] private int defaultCapacity = 10;
         [SerializeField] private int maxSize = 30;
@@ -22,11 +17,11 @@ namespace Game.Core.Gameplay
         [Header("SFX Tweak Settings")] [SerializeField]
         private Vector2 pitchRange = new Vector2(0.9f, 1.1f);
 
-        private ObjectPool<AudioSource> _pool;
+        private ObjectPool<AudioSource> pool;
 
         private void Awake()
         {
-            _pool = new ObjectPool<AudioSource>(
+            pool = new ObjectPool<AudioSource>(
                 createFunc: CreateAudioSource,
                 actionOnGet: OnTakeFromPool,
                 actionOnRelease: OnReturnedToPool,
@@ -39,7 +34,6 @@ namespace Game.Core.Gameplay
 
         private AudioSource CreateAudioSource()
         {
-            // Ưu tiên instantiate từ Prefab đã setup sẵn (AudioMixer, Volume, Spatial Blend...)
             if (audioSourcePrefab != null)
             {
                 AudioSource source = Instantiate(audioSourcePrefab, this.transform);
@@ -48,7 +42,7 @@ namespace Game.Core.Gameplay
             }
             else
             {
-                // Fallback an toàn nếu chưa gán Prefab
+                // Ensure fallback when prefab not exists
                 Debug.LogWarning(
                     "Chưa gán AudioSource Prefab vào SfxManager! Hệ thống đang dùng fallback tạo bằng code.");
                 GameObject go = new GameObject("SFX_AudioSource_PoolItem");
@@ -56,7 +50,7 @@ namespace Game.Core.Gameplay
 
                 AudioSource source = go.AddComponent<AudioSource>();
                 source.playOnAwake = false;
-                source.spatialBlend = 0f; // 2D Sound mặc định
+                source.spatialBlend = 0f;
 
                 return source;
             }
@@ -83,7 +77,7 @@ namespace Game.Core.Gameplay
         {
             if (clip == null) return;
 
-            AudioSource source = _pool.Get();
+            AudioSource source = pool.Get();
             source.clip = clip;
             source.volume = volume;
             source.pitch = Random.Range(pitchRange.x, pitchRange.y);
@@ -103,12 +97,12 @@ namespace Game.Core.Gameplay
 
                 if (source != null && source.gameObject != null && source.gameObject.activeInHierarchy)
                 {
-                    _pool.Release(source);
+                    pool.Release(source);
                 }
             }
             catch (OperationCanceledException)
             {
-                // Bỏ qua lỗi êm ái khi đổi Scene. ObjectPool sẽ tự động bị huỷ theo Scene.
+                // Skip gracefully when Scene changes. ObjectPool will be automatically destroyed with the Scene.
             }
         }
     }

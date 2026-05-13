@@ -19,12 +19,12 @@ namespace Game.Core.Gameplay
 
         [Header("Audio")] [SerializeField] private AudioClip matchClip;
 
-        private UIDocument _uiDocument;
-        private VisualElement _rackContainer;
-        private Vector2[] _slotScreenPositions;
+        private UIDocument uiDocument;
+        private VisualElement rackContainer;
+        private Vector2[] slotScreenPositions;
 
-        private RackController _rackController;
-        private SfxManager _sfxManager;
+        private RackController rackController;
+        private SfxManager sfxManager;
 
         private struct TileMotions
         {
@@ -38,59 +38,59 @@ namespace Game.Core.Gameplay
             }
         }
 
-        private Dictionary<Tile, TileMotions> _activeMoveRoutines = new Dictionary<Tile, TileMotions>();
-        private List<Tile> _visualSlots = new List<Tile>();
+        private readonly Dictionary<Tile, TileMotions> activeMoveRoutines = new Dictionary<Tile, TileMotions>();
+        private readonly List<Tile> visualSlots = new List<Tile>();
 
         [Inject]
-        private void Construct(RackController rackController, SfxManager sfxManager)
+        private void Construct(RackController rackControllerSource, SfxManager sfxManagerSource)
         {
-            _rackController = rackController;
-            _sfxManager = sfxManager;
+            this.rackController = rackControllerSource;
+            this.sfxManager = sfxManagerSource;
         }
 
         private void Awake()
         {
-            _uiDocument = GetComponent<UIDocument>();
+            uiDocument = GetComponent<UIDocument>();
         }
 
         private void OnEnable()
         {
-            if (_rackController != null)
+            if (rackController != null)
             {
-                _rackController.OnRackInitialized += HandleRackInitialized;
-                _rackController.OnRackUpdated += HandleRackUpdated;
-                _rackController.OnTilesMatched += HandleTilesMatched;
+                rackController.OnRackInitialized += HandleRackInitialized;
+                rackController.OnRackUpdated += HandleRackUpdated;
+                rackController.OnTilesMatched += HandleTilesMatched;
             }
         }
 
         private void OnDisable()
         {
-            if (_rackController != null)
+            if (rackController != null)
             {
-                _rackController.OnRackInitialized -= HandleRackInitialized;
-                _rackController.OnRackUpdated -= HandleRackUpdated;
-                _rackController.OnTilesMatched -= HandleTilesMatched;
+                rackController.OnRackInitialized -= HandleRackInitialized;
+                rackController.OnRackUpdated -= HandleRackUpdated;
+                rackController.OnTilesMatched -= HandleTilesMatched;
             }
 
-            foreach (var handle in _activeMoveRoutines.Values)
+            foreach (var handle in activeMoveRoutines.Values)
             {
                 handle.CancelAll();
             }
 
-            _activeMoveRoutines.Clear();
-            _visualSlots.Clear();
+            activeMoveRoutines.Clear();
+            visualSlots.Clear();
         }
 
         private void HandleRackInitialized(int maxSlots)
         {
-            _visualSlots.Clear();
-            _slotScreenPositions = new Vector2[maxSlots];
+            visualSlots.Clear();
+            slotScreenPositions = new Vector2[maxSlots];
             GenerateUIToolkit(maxSlots);
         }
 
         private void GenerateUIToolkit(int maxSlots)
         {
-            var root = _uiDocument.rootVisualElement;
+            var root = uiDocument.rootVisualElement;
             root.Clear();
 
             if (rackStyleSheet != null)
@@ -102,9 +102,9 @@ namespace Game.Core.Gameplay
             wrapper.AddToClassList("rack-container");
             root.Add(wrapper);
 
-            _rackContainer = new VisualElement();
-            _rackContainer.AddToClassList("rack-bg");
-            wrapper.Add(_rackContainer);
+            rackContainer = new VisualElement();
+            rackContainer.AddToClassList("rack-bg");
+            wrapper.Add(rackContainer);
 
             for (int i = 0; i < maxSlots; i++)
             {
@@ -112,9 +112,11 @@ namespace Game.Core.Gameplay
                 slot.AddToClassList("rack-slot");
 
                 int slotIndex = i;
-                slot.RegisterCallback<GeometryChangedEvent>(evt => UpdateSlotScreenPosition(evt, slotIndex, slot));
+                slot.RegisterCallback<GeometryChangedEvent>(
+                    evt => UpdateSlotScreenPosition(evt, slotIndex, slot)
+                );
 
-                _rackContainer.Add(slot);
+                rackContainer.Add(slot);
             }
         }
 
@@ -127,7 +129,7 @@ namespace Game.Core.Gameplay
             float normalizedX = panelPos.x / panel.visualTree.layout.width;
             float normalizedY = panelPos.y / panel.visualTree.layout.height;
 
-            _slotScreenPositions[index] = new Vector2(
+            slotScreenPositions[index] = new Vector2(
                 normalizedX * Screen.width,
                 (1f - normalizedY) * Screen.height
             );
@@ -140,13 +142,13 @@ namespace Game.Core.Gameplay
 
             foreach (var tile in currentTiles)
             {
-                if (!_visualSlots.Contains(tile))
+                if (!visualSlots.Contains(tile))
                 {
                     tile.SetSortingOrder(999);
                     tile.transform.SetParent(null);
 
                     int insertIndex = GetVisualInsertIndex(tile.IconID);
-                    _visualSlots.Insert(insertIndex, tile);
+                    visualSlots.Insert(insertIndex, tile);
                 }
             }
 
@@ -156,25 +158,25 @@ namespace Game.Core.Gameplay
         private int GetVisualInsertIndex(int iconId)
         {
             int lastIndex = -1;
-            for (int i = 0; i < _visualSlots.Count; i++)
+            for (int i = 0; i < visualSlots.Count; i++)
             {
-                if (_visualSlots[i].IconID == iconId) lastIndex = i;
+                if (visualSlots[i].IconID == iconId) lastIndex = i;
             }
 
-            return lastIndex != -1 ? lastIndex + 1 : _visualSlots.Count;
+            return lastIndex != -1 ? lastIndex + 1 : visualSlots.Count;
         }
 
         private void UpdateAllVisualTilePositions(Camera mainCam)
         {
-            for (int i = 0; i < _visualSlots.Count; i++)
+            for (int i = 0; i < visualSlots.Count; i++)
             {
-                Tile tile = _visualSlots[i];
+                Tile tile = visualSlots[i];
 
                 if (tile.State == TileState.Matched) continue;
 
                 Vector3 targetPos = GetWorldPositionForSlot(i, mainCam);
 
-                if (_activeMoveRoutines.TryGetValue(tile, out TileMotions activeHandle))
+                if (activeMoveRoutines.TryGetValue(tile, out TileMotions activeHandle))
                 {
                     activeHandle.CancelAll();
                 }
@@ -191,7 +193,7 @@ namespace Game.Core.Gameplay
                     .WithEase(Ease.OutQuad)
                     .BindToLocalScale(tile.transform);
 
-                _activeMoveRoutines[tile] = new TileMotions
+                activeMoveRoutines[tile] = new TileMotions
                 {
                     PositionHandle = posHandle,
                     ScaleHandle = scaleHandle
@@ -202,23 +204,23 @@ namespace Game.Core.Gameplay
         private Vector3 GetWorldPositionForSlot(int index, Camera mainCam)
         {
             Vector2 screenPos;
-            if (index < _slotScreenPositions.Length)
+            if (index < slotScreenPositions.Length)
             {
-                screenPos = _slotScreenPositions[index];
+                screenPos = slotScreenPositions[index];
             }
             else
             {
-                if (_slotScreenPositions.Length >= 2)
+                if (slotScreenPositions.Length >= 2)
                 {
-                    Vector2 lastPos = _slotScreenPositions[_slotScreenPositions.Length - 1];
-                    Vector2 secondLast = _slotScreenPositions[_slotScreenPositions.Length - 2];
+                    Vector2 lastPos = slotScreenPositions[^1];
+                    Vector2 secondLast = slotScreenPositions[^2];
                     Vector2 dir = lastPos - secondLast;
 
-                    screenPos = lastPos + dir * (index - _slotScreenPositions.Length + 1);
+                    screenPos = lastPos + dir * (index - slotScreenPositions.Length + 1);
                 }
                 else
                 {
-                    screenPos = _slotScreenPositions[0];
+                    screenPos = slotScreenPositions[0];
                 }
             }
 
@@ -231,8 +233,8 @@ namespace Game.Core.Gameplay
 
         private void HandleTilesMatched(Tile t1, Tile t2, Tile t3, int iconId)
         {
-            // [MỚI] Phát âm thanh khi ghép cặp 3 viên gạch!
-            if (matchClip != null && _sfxManager != null) _sfxManager.Play(matchClip, 1f);
+            if (matchClip != null && sfxManager != null)
+                sfxManager.Play(matchClip, 1f);
 
             ProcessMatchTask(t1, t2, t3, this.GetCancellationTokenOnDestroy()).Forget();
         }
@@ -261,9 +263,9 @@ namespace Game.Core.Gameplay
 
             if (cancellationToken.IsCancellationRequested) return;
 
-            _visualSlots.Remove(t1);
-            _visualSlots.Remove(t2);
-            _visualSlots.Remove(t3);
+            visualSlots.Remove(t1);
+            visualSlots.Remove(t2);
+            visualSlots.Remove(t3);
 
             if (t1 != null) Destroy(t1.gameObject);
             if (t2 != null) Destroy(t2.gameObject);
@@ -301,11 +303,10 @@ namespace Game.Core.Gameplay
 
         private void CancelMotionForTile(Tile tile)
         {
-            if (tile != null && _activeMoveRoutines.TryGetValue(tile, out TileMotions handle))
-            {
-                handle.CancelAll();
-                _activeMoveRoutines.Remove(tile);
-            }
+            if (tile == null || !activeMoveRoutines.TryGetValue(tile, out TileMotions handle)) return;
+
+            handle.CancelAll();
+            activeMoveRoutines.Remove(tile);
         }
     }
 }

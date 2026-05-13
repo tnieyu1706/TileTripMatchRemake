@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using ZLinq;
 
-namespace SceneManagement
+namespace Game.Core.Global
 {
     [Serializable]
     public class SceneGroupManager
