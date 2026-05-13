@@ -8,12 +8,12 @@ namespace Game.Core.Gameplay
 {
     public class BoardController : MonoBehaviour
     {
-        [Header("References")]
-        [SerializeField] private Tile tilePrefab;
+        [Header("References")] [SerializeField]
+        private Tile tilePrefab;
+
         [SerializeField] private Transform boardParent;
-        
-        [Header("Data")]
-        [SerializeField] private Sprite[] availableIcons; 
+
+        [Header("Data")] [SerializeField] private Sprite[] availableIcons;
 
         private RackController _rackController;
         private List<Tile> activeTiles = new List<Tile>();
@@ -32,80 +32,27 @@ namespace Game.Core.Gameplay
             _rackController.Initialize(levelData.rackSlots);
 
             // 1. Sinh toạ độ gạch tự động thông qua BFS Generator
-            List<Vector3> allPositions = BoardGenerator.GeneratePositions(levelData.tilesNumber, levelData.layersNumber);
-            
+            List<Vector3> allPositions =
+                BoardGenerator.GeneratePositions(levelData.tilesNumber, levelData.layersNumber);
+
             if (allPositions.Count == 0) return;
 
-            // 2. [MỚI] Căn giữa và điều chỉnh Camera tự động theo tỉ lệ màn hình
-            CenterAndFitBoard(allPositions);
-
-            // 3. Phân bổ Icon theo thuật toán Chơi ngược (Bảo đảm giải được)
+            // 2. Phân bổ Icon theo thuật toán Chơi ngược (Bảo đảm giải được)
             int[] assignedIcons = GenerateSolvableIconDistribution(allPositions);
 
-            // 4. Sinh object thực tế
+            // 3. Sinh object thực tế
             for (int i = 0; i < allPositions.Count; i++)
             {
                 Tile newTile = Instantiate(tilePrefab, allPositions[i], Quaternion.identity, boardParent);
                 Sprite iconSprite = availableIcons[assignedIcons[i]];
-                
+
                 newTile.Init(assignedIcons[i], iconSprite, allPositions[i], (int)allPositions[i].z);
                 newTile.OnTileClicked += HandleTileClicked;
-                
+
                 activeTiles.Add(newTile);
             }
 
             UpdateTilesState();
-        }
-
-        /// <summary>
-        /// Tính toán khung bao quanh của bàn cờ, dời trọng tâm về (0,0) và Zoom camera cho vừa màn hình
-        /// </summary>
-        private void CenterAndFitBoard(List<Vector3> positions)
-        {
-            if (positions.Count == 0) return;
-
-            // 1. Tìm giới hạn min, max của toạ độ
-            float minX = float.MaxValue, maxX = float.MinValue;
-            float minY = float.MaxValue, maxY = float.MinValue;
-
-            foreach (var pos in positions)
-            {
-                if (pos.x < minX) minX = pos.x;
-                if (pos.x > maxX) maxX = pos.x;
-                if (pos.y < minY) minY = pos.y;
-                if (pos.y > maxY) maxY = pos.y;
-            }
-
-            // 2. Tính toạ độ tâm và dời toàn bộ map về giữa (0,0)
-            Vector3 centerOffset = new Vector3((minX + maxX) / 2f, (minY + maxY) / 2f, 0f);
-            for (int i = 0; i < positions.Count; i++)
-            {
-                positions[i] -= centerOffset;
-            }
-
-            // 3. Phóng to/Thu nhỏ Camera để chứa trọn Board
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                // Thêm padding cho Board: 1 đơn vị hai bên, 4 đơn vị dọc để chừa chỗ cho UI Rack phía dưới
-                float boardWidth = (maxX - minX) + 1.5f; 
-                float boardHeight = (maxY - minY) + 4.0f;
-
-                float screenAspect = (float)Screen.width / Screen.height;
-
-                // Quy đổi chiều rộng cần thiết sang hệ đo của Orthographic Size
-                float requiredSizeX = (boardWidth / screenAspect) * 0.5f;
-                float requiredSizeY = boardHeight * 0.5f;
-
-                // Lấy kích thước lớn nhất để không phần nào bị cắt
-                float optimalSize = Mathf.Max(requiredSizeX, requiredSizeY);
-                
-                // Set tối thiểu là 5f để board nhỏ không bị zoom vào quá to
-                cam.orthographicSize = Mathf.Max(optimalSize, 5f);
-
-                // Dịch chuyển Camera xuống dưới 1.5 đơn vị (Điều này giúp dời tâm Board nhích lên trên một chút, né phần RackUI)
-                cam.transform.position = new Vector3(0, -1.5f, -10f);
-            }
         }
 
         private int[] GenerateSolvableIconDistribution(List<Vector3> positions)
@@ -113,7 +60,7 @@ namespace Game.Core.Gameplay
             int totalTiles = positions.Count;
             int[] assignedIconIds = new int[totalTiles];
             bool[] isAssigned = new bool[totalTiles];
-            
+
             int assignedCount = 0;
             while (assignedCount < totalTiles)
             {
@@ -127,7 +74,7 @@ namespace Game.Core.Gameplay
                     for (int j = 0; j < totalTiles; j++)
                     {
                         if (i == j || isAssigned[j]) continue;
-                        
+
                         if (IsOverlapping(positions[i], positions[j]))
                         {
                             isOverlapped = true;
@@ -155,13 +102,33 @@ namespace Game.Core.Gameplay
                 }
                 else
                 {
-                    Debug.LogWarning("Map có thiết kế quá hẹp, thuật toán fallback được kích hoạt.");
+                    Debug.LogWarning(
+                        "Map có thiết kế quá hẹp, thuật toán fallback được kích hoạt. Đang gán ngẫu nhiên theo nhóm 3...");
+
+                    // Gom tất cả các index chưa được gán lại
+                    List<int> remainingIndices = new List<int>();
                     for (int i = 0; i < totalTiles; i++)
                     {
                         if (!isAssigned[i])
                         {
-                            assignedIconIds[i] = UnityEngine.Random.Range(0, availableIcons.Length);
-                            isAssigned[i] = true;
+                            remainingIndices.Add(i);
+                        }
+                    }
+
+                    // Xáo trộn nhẹ để kết quả ngẫu nhiên, tránh việc các viên gần nhau luôn giống nhau
+                    remainingIndices = remainingIndices.OrderBy(x => UnityEngine.Random.value).ToList();
+
+                    // Gán icon theo từng cụm 3 viên
+                    for (int i = 0; i < remainingIndices.Count; i += 3)
+                    {
+                        int randomIconId = UnityEngine.Random.Range(0, availableIcons.Length);
+
+                        // Lặp tối đa 3 lần để gán đủ bộ 3 cho Icon vừa bốc
+                        for (int j = 0; j < 3 && (i + j) < remainingIndices.Count; j++)
+                        {
+                            int index = remainingIndices[i + j];
+                            assignedIconIds[index] = randomIconId;
+                            isAssigned[index] = true;
                             assignedCount++;
                         }
                     }
@@ -186,7 +153,7 @@ namespace Game.Core.Gameplay
                         break;
                     }
                 }
-                
+
                 tile.SetState(isBlocked ? TileState.Blocked : TileState.Exposed);
             }
         }
@@ -207,7 +174,7 @@ namespace Game.Core.Gameplay
 
             clickedTile.OnTileClicked -= HandleTileClicked;
             activeTiles.Remove(clickedTile);
-            
+
             _rackController.AddTile(clickedTile);
 
             UpdateTilesState();
@@ -224,6 +191,7 @@ namespace Game.Core.Gameplay
             {
                 if (tile != null) Destroy(tile.gameObject);
             }
+
             activeTiles.Clear();
         }
     }

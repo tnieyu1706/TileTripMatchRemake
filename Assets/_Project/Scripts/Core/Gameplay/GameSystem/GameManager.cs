@@ -3,20 +3,22 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Reflex.Attributes;
-using Game.Core.Data;
+using Game.Core.Data; // Nơi chứa PlayerDataSoap
 
 namespace Game.Core.Gameplay
 {
     public class GameManager : MonoBehaviour
     {
         [Header("Level Progression")] [SerializeField]
-        private List<LevelDataSo> levelList;
+        private List<LevelDataSo> levelList; // Bỏ 10 levels của bạn vào đây
 
-        private int _currentLevelIndex = 0;
         private BoardController _boardController;
         private RackController _rackController;
-        private PlayerDataSoap _playerData;
+        private PlayerDataSoap _playerData; // Data lưu Level hiện tại
 
+        private int _currentLevelIndex = 0;
+
+        // Events cho UI (GameplayMenuGUI) lắng nghe
         public event Action OnLevelWon;
         public event Action OnLevelLost;
 
@@ -31,19 +33,20 @@ namespace Game.Core.Gameplay
 
         private void Start()
         {
+            // Đăng ký sự kiện từ các Core Systems
             _boardController.OnBoardCleared += HandleWinCondition;
             _rackController.OnRackFull += HandleLoseCondition;
 
-            // Logic tự động load level tương ứng hiện tại ngay khi Scene bắt đầu
+            // Tự động load level hiện tại khi vừa vào Gameplay Scene
             if (levelList != null && levelList.Count > 0)
             {
-                // Đồng bộ biến nội bộ với dữ liệu từ SOAP (Giới hạn kịch trần để tránh lỗi Out of Range)
+                // Lấy level từ Data (bảo vệ tránh out of range nếu xoá bớt level)
                 _currentLevelIndex = Mathf.Clamp(_playerData.CurrentLevelIndex, 0, levelList.Count - 1);
                 LoadLevelByIndex(_currentLevelIndex);
             }
             else
             {
-                Debug.LogWarning("Chưa có LevelDataSo nào được thêm vào danh sách levelList của GameManager!");
+                Debug.LogError("GameManager: Chưa có LevelDataSo nào trong levelList!");
             }
         }
 
@@ -58,13 +61,10 @@ namespace Game.Core.Gameplay
 
         public void LoadLevelByIndex(int index)
         {
-            if (index < 0 || index >= levelList.Count)
-            {
-                Debug.LogWarning("Đã hoàn thành toàn bộ Level hoặc Level không tồn tại!");
-                return;
-            }
+            if (index < 0 || index >= levelList.Count) return;
 
             _currentLevelIndex = index;
+            // Chỉ cần quăng Data cho BoardController, phần còn lại Board tự lo
             _boardController.InitializeBoard(levelList[_currentLevelIndex]);
         }
 
@@ -76,15 +76,16 @@ namespace Game.Core.Gameplay
         public void LoadNextLevel()
         {
             _currentLevelIndex++;
+
             if (_currentLevelIndex < levelList.Count)
             {
-                // Cập nhật và lưu lại level mới qua SOAP
+                // Lưu lại mốc level mới vào PlayerPrefs (thông qua SOAP)
                 _playerData.SetLevel(_currentLevelIndex);
                 LoadLevelByIndex(_currentLevelIndex);
             }
             else
             {
-                Debug.Log("Chúc mừng! Bạn đã phá đảo game.");
+                Debug.Log("Chúc mừng! Bạn đã hoàn thành toàn bộ 10 Levels.");
                 ReturnToHomeScene();
             }
         }
@@ -96,12 +97,12 @@ namespace Game.Core.Gameplay
 
         private void HandleWinCondition()
         {
-            OnLevelWon?.Invoke();
+            OnLevelWon?.Invoke(); // Bắn event để WinPanel hiện lên
         }
 
         private void HandleLoseCondition()
         {
-            OnLevelLost?.Invoke();
+            OnLevelLost?.Invoke(); // Bắn event để LosePanel hiện lên
         }
     }
 }

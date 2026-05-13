@@ -12,7 +12,6 @@ namespace Game.Core.Gameplay
         private int _maxSlots;
         private List<Tile> _rackTiles = new List<Tile>();
 
-        // Events for UI/View to listen
         public event Action<int> OnRackInitialized;
         public event Action<IReadOnlyList<Tile>> OnRackUpdated;
         public event Action<Tile, Tile, Tile, int> OnTilesMatched;
@@ -21,6 +20,16 @@ namespace Game.Core.Gameplay
         public void Initialize(int slotsCount)
         {
             _maxSlots = slotsCount;
+
+            // [SỬA LỖI]: Phải phá huỷ các GameObject gạch đang nằm trong Rack trước khi xoá Data
+            foreach (var tile in _rackTiles)
+            {
+                if (tile != null)
+                {
+                    Destroy(tile.gameObject);
+                }
+            }
+
             _rackTiles.Clear();
             OnRackInitialized?.Invoke(_maxSlots);
         }
@@ -35,11 +44,10 @@ namespace Game.Core.Gameplay
             if (!CanAcceptTile()) return;
 
             tile.SetState(TileState.InRack);
-            
+
             int insertIndex = GetInsertIndex(tile.IconID);
             _rackTiles.Insert(insertIndex, tile);
 
-            // Bắn event báo cho View biết danh sách vừa thay đổi để sắp xếp lại
             OnRackUpdated?.Invoke(_rackTiles);
 
             if (!CheckForMatches())
@@ -61,7 +69,7 @@ namespace Game.Core.Gameplay
                     lastIndex = i;
                 }
             }
-            
+
             return lastIndex != -1 ? lastIndex + 1 : _rackTiles.Count;
         }
 
@@ -77,16 +85,14 @@ namespace Game.Core.Gameplay
                     Tile t3 = _rackTiles[i + 2];
 
                     _rackTiles.RemoveRange(i, 3);
-                    
-                    // Bắn event báo cho View tiến hành hủy 3 viên này
+
                     OnTilesMatched?.Invoke(t1, t2, t3, id);
-                    
-                    // Cập nhật lại danh sách sau khi xoá để View dồn gạch lại
                     OnRackUpdated?.Invoke(_rackTiles);
-                    
+
                     return true;
                 }
             }
+
             return false;
         }
     }
