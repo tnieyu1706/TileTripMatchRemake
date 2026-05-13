@@ -10,27 +10,42 @@ using LitMotion.Extensions;
 
 namespace Game.Core.Gameplay
 {
-    /// <summary>
-    /// Presentation Handler (View)
-    /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class RackView : MonoBehaviour
     {
-        [Header("Settings")] [SerializeField] private float moveSpeed = 25f;
+        [Header("Settings")] [SerializeField] private float moveSpeed = 35f;
         [SerializeField] private StyleSheet rackStyleSheet;
+        [SerializeField] private Vector3 targetTileScaleInRack = new Vector3(1f, 1f, 1f);
+
+        [Header("Audio")] [SerializeField] private AudioClip matchClip;
 
         private UIDocument _uiDocument;
         private VisualElement _rackContainer;
-        private Vector3[] _slotWorldPositions;
+        private Vector2[] _slotScreenPositions;
 
         private RackController _rackController;
+        private SfxManager _sfxManager;
 
-        private Dictionary<Tile, MotionHandle> _activeMoveRoutines = new Dictionary<Tile, MotionHandle>();
+        private struct TileMotions
+        {
+            public MotionHandle PositionHandle;
+            public MotionHandle ScaleHandle;
+
+            public void CancelAll()
+            {
+                if (PositionHandle.IsActive()) PositionHandle.Cancel();
+                if (ScaleHandle.IsActive()) ScaleHandle.Cancel();
+            }
+        }
+
+        private Dictionary<Tile, TileMotions> _activeMoveRoutines = new Dictionary<Tile, TileMotions>();
+        private List<Tile> _visualSlots = new List<Tile>();
 
         [Inject]
-        private void Construct(RackController rackController)
+        private void Construct(RackController rackController, SfxManager sfxManager)
         {
             _rackController = rackController;
+            _sfxManager = sfxManager;
         }
 
         private void Awake()
@@ -57,18 +72,19 @@ namespace Game.Core.Gameplay
                 _rackController.OnTilesMatched -= HandleTilesMatched;
             }
 
-            // Hủy toàn bộ Motion đang chạy khi object bị tắt (hoặc chuyển Scene) để tránh rò rỉ bộ nhớ & lỗi Reference
             foreach (var handle in _activeMoveRoutines.Values)
             {
-                if (handle.IsActive()) handle.Cancel();
+                handle.CancelAll();
             }
 
             _activeMoveRoutines.Clear();
+            _visualSlots.Clear();
         }
 
         private void HandleRackInitialized(int maxSlots)
         {
-            _slotWorldPositions = new Vector3[maxSlots];
+            _visualSlots.Clear();
+            _slotScreenPositions = new Vector2[maxSlots];
             GenerateUIToolkit(maxSlots);
         }
 
@@ -96,68 +112,128 @@ namespace Game.Core.Gameplay
                 slot.AddToClassList("rack-slot");
 
                 int slotIndex = i;
-                slot.RegisterCallback<GeometryChangedEvent>(evt => UpdateSlotWorldPosition(evt, slotIndex, slot));
+                slot.RegisterCallback<GeometryChangedEvent>(evt => UpdateSlotScreenPosition(evt, slotIndex, slot));
 
                 _rackContainer.Add(slot);
             }
         }
 
-        private void UpdateSlotWorldPosition(GeometryChangedEvent evt, int index, VisualElement slot)
+        private void UpdateSlotScreenPosition(GeometryChangedEvent evt, int index, VisualElement slot)
         {
             var panel = slot.panel;
             if (panel == null) return;
 
-            // Khai báo lại panelPos từ tọa độ bounds của UI slot
             Vector2 panelPos = slot.worldBound.center;
-
             float normalizedX = panelPos.x / panel.visualTree.layout.width;
             float normalizedY = panelPos.y / panel.visualTree.layout.height;
 
-            Vector2 screenPos = new Vector2(
+            _slotScreenPositions[index] = new Vector2(
                 normalizedX * Screen.width,
                 (1f - normalizedY) * Screen.height
             );
-
-            Camera mainCam = Camera.main;
-            if (mainCam != null)
-            {
-                Vector3 worldPos = mainCam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y,
-                    Mathf.Abs(mainCam.transform.position.z)));
-                worldPos.z = 0f;
-                _slotWorldPositions[index] = worldPos;
-            }
         }
 
         private void HandleRackUpdated(IReadOnlyList<Tile> currentTiles)
         {
-            for (int i = 0; i < currentTiles.Count; i++)
+            Camera mainCam = Camera.main;
+            if (mainCam == null) return;
+
+            foreach (var tile in currentTiles)
             {
-                Tile tile = currentTiles[i];
-                tile.SetSortingOrder(999);
-
-                if (i < _slotWorldPositions.Length)
+                if (!_visualSlots.Contains(tile))
                 {
-                    Vector3 targetPos = _slotWorldPositions[i];
+                    tile.SetSortingOrder(999);
+                    tile.transform.SetParent(null);
 
-                    if (_activeMoveRoutines.TryGetValue(tile, out MotionHandle activeHandle) && activeHandle.IsActive())
-                    {
-                        activeHandle.Cancel();
-                    }
-
-                    float distance = Vector3.Distance(tile.transform.position, targetPos);
-                    float duration = Mathf.Clamp(distance / moveSpeed, 0.1f, 0.4f);
-
-                    MotionHandle newHandle = LMotion.Create(tile.transform.position, targetPos, duration)
-                        .WithEase(Ease.OutQuad)
-                        .BindToPosition(tile.transform);
-
-                    _activeMoveRoutines[tile] = newHandle;
+                    int insertIndex = GetVisualInsertIndex(tile.IconID);
+                    _visualSlots.Insert(insertIndex, tile);
                 }
             }
+
+            UpdateAllVisualTilePositions(mainCam);
+        }
+
+        private int GetVisualInsertIndex(int iconId)
+        {
+            int lastIndex = -1;
+            for (int i = 0; i < _visualSlots.Count; i++)
+            {
+                if (_visualSlots[i].IconID == iconId) lastIndex = i;
+            }
+
+            return lastIndex != -1 ? lastIndex + 1 : _visualSlots.Count;
+        }
+
+        private void UpdateAllVisualTilePositions(Camera mainCam)
+        {
+            for (int i = 0; i < _visualSlots.Count; i++)
+            {
+                Tile tile = _visualSlots[i];
+
+                if (tile.State == TileState.Matched) continue;
+
+                Vector3 targetPos = GetWorldPositionForSlot(i, mainCam);
+
+                if (_activeMoveRoutines.TryGetValue(tile, out TileMotions activeHandle))
+                {
+                    activeHandle.CancelAll();
+                }
+
+                float distance = Vector3.Distance(tile.transform.position, targetPos);
+                float duration = Mathf.Clamp(distance / moveSpeed, 0.1f, 0.35f);
+
+                MotionHandle posHandle = LMotion.Create(tile.transform.position, targetPos, duration)
+                    .WithEase(Ease.OutBack)
+                    .BindToPosition(tile.transform);
+
+                MotionHandle scaleHandle = LMotion
+                    .Create(tile.transform.localScale, targetTileScaleInRack, duration)
+                    .WithEase(Ease.OutQuad)
+                    .BindToLocalScale(tile.transform);
+
+                _activeMoveRoutines[tile] = new TileMotions
+                {
+                    PositionHandle = posHandle,
+                    ScaleHandle = scaleHandle
+                };
+            }
+        }
+
+        private Vector3 GetWorldPositionForSlot(int index, Camera mainCam)
+        {
+            Vector2 screenPos;
+            if (index < _slotScreenPositions.Length)
+            {
+                screenPos = _slotScreenPositions[index];
+            }
+            else
+            {
+                if (_slotScreenPositions.Length >= 2)
+                {
+                    Vector2 lastPos = _slotScreenPositions[_slotScreenPositions.Length - 1];
+                    Vector2 secondLast = _slotScreenPositions[_slotScreenPositions.Length - 2];
+                    Vector2 dir = lastPos - secondLast;
+
+                    screenPos = lastPos + dir * (index - _slotScreenPositions.Length + 1);
+                }
+                else
+                {
+                    screenPos = _slotScreenPositions[0];
+                }
+            }
+
+            Vector3 targetPos =
+                mainCam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y,
+                    Mathf.Abs(mainCam.transform.position.z)));
+            targetPos.z = 0f;
+            return targetPos;
         }
 
         private void HandleTilesMatched(Tile t1, Tile t2, Tile t3, int iconId)
         {
+            // [MỚI] Phát âm thanh khi ghép cặp 3 viên gạch!
+            if (matchClip != null && _sfxManager != null) _sfxManager.Play(matchClip, 1f);
+
             ProcessMatchTask(t1, t2, t3, this.GetCancellationTokenOnDestroy()).Forget();
         }
 
@@ -172,21 +248,62 @@ namespace Game.Core.Gameplay
 
             if (isCanceled) return;
 
-            // Xoá bỏ an toàn: Hủy bỏ Motion đang chạy (nếu có) trước khi Destroy Object
             CancelMotionForTile(t1);
             CancelMotionForTile(t2);
             CancelMotionForTile(t3);
 
+            float popDuration = 0.25f;
+            var t1Task = PlayPopAnimationAsync(t1, popDuration, cancellationToken);
+            var t2Task = PlayPopAnimationAsync(t2, popDuration, cancellationToken);
+            var t3Task = PlayPopAnimationAsync(t3, popDuration, cancellationToken);
+
+            await UniTask.WhenAll(t1Task, t2Task, t3Task).SuppressCancellationThrow();
+
+            if (cancellationToken.IsCancellationRequested) return;
+
+            _visualSlots.Remove(t1);
+            _visualSlots.Remove(t2);
+            _visualSlots.Remove(t3);
+
             if (t1 != null) Destroy(t1.gameObject);
             if (t2 != null) Destroy(t2.gameObject);
             if (t3 != null) Destroy(t3.gameObject);
+
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                UpdateAllVisualTilePositions(mainCam);
+            }
+        }
+
+        private async UniTask PlayPopAnimationAsync(Tile tile, float duration, CancellationToken cancellationToken)
+        {
+            if (tile == null) return;
+
+            try
+            {
+                await LMotion.Create(tile.transform.localScale, targetTileScaleInRack * 1.25f, duration * 0.5f)
+                    .WithEase(Ease.OutQuad)
+                    .BindToLocalScale(tile.transform)
+                    .ToUniTask(cancellationToken);
+
+                if (tile == null) return;
+
+                await LMotion.Create(tile.transform.localScale, Vector3.zero, duration * 0.5f)
+                    .WithEase(Ease.InBack)
+                    .BindToLocalScale(tile.transform)
+                    .ToUniTask(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         private void CancelMotionForTile(Tile tile)
         {
-            if (tile != null && _activeMoveRoutines.TryGetValue(tile, out MotionHandle handle))
+            if (tile != null && _activeMoveRoutines.TryGetValue(tile, out TileMotions handle))
             {
-                if (handle.IsActive()) handle.Cancel();
+                handle.CancelAll();
                 _activeMoveRoutines.Remove(tile);
             }
         }

@@ -1,5 +1,7 @@
 using System;
 using UnityEngine;
+using LitMotion;
+using LitMotion.Extensions;
 
 namespace Game.Core.Gameplay
 {
@@ -14,14 +16,24 @@ namespace Game.Core.Gameplay
     [RequireComponent(typeof(BoxCollider2D))]
     public class Tile : MonoBehaviour
     {
-        [Header("References")]
-        [SerializeField] private SpriteRenderer baseRenderer;
+        [Header("References")] [SerializeField]
+        private SpriteRenderer baseRenderer;
+
         [SerializeField] private SpriteRenderer iconRenderer;
         [SerializeField] private BoxCollider2D tileCollider;
 
-        [Header("Visual Settings")]
-        [SerializeField] private Color blockedColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+        [Header("Visual Settings")] [SerializeField]
+        private Color blockedColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+
         [SerializeField] private Color exposedColor = Color.white;
+
+        [Header("Animation Settings")] [SerializeField]
+        private float hoverScale = 1.05f;
+
+        [SerializeField] private float tapScale = 0.9f;
+        [SerializeField] private float animDuration = 0.15f;
+
+        [Header("Audio")] [SerializeField] private AudioClip tapClip;
 
         public int IconID { get; private set; }
         public Vector3 GridCoordinate { get; private set; }
@@ -29,15 +41,22 @@ namespace Game.Core.Gameplay
 
         public event Action<Tile> OnTileClicked;
 
-        public void Init(int iconId, Sprite iconSprite, Vector3 gridCoord, int layerIndex)
+        private SfxManager _sfxManager;
+        private MotionHandle _scaleMotion;
+        private Vector3 _originalScale = Vector3.one;
+
+        // Bỏ Attribute [Inject] ở đây. Nhận SfxManager thông qua hàm Init
+        public void Init(int iconId, Sprite iconSprite, Vector3 gridCoord, int layerIndex, SfxManager sfxManager)
         {
             IconID = iconId;
             iconRenderer.sprite = iconSprite;
             GridCoordinate = gridCoord;
-            
-            SetSortingOrder(layerIndex * 10);
+            _sfxManager = sfxManager;
 
-            SetState(TileState.Exposed); 
+            SetSortingOrder(layerIndex * 10);
+            SetState(TileState.Exposed);
+
+            _originalScale = transform.localScale;
         }
 
         public void SetState(TileState newState)
@@ -62,26 +81,57 @@ namespace Game.Core.Gameplay
                 case TileState.Matched:
                     baseRenderer.color = exposedColor;
                     iconRenderer.color = exposedColor;
-                    tileCollider.enabled = false; 
+                    tileCollider.enabled = false;
+
+                    PlayScaleAnim(_originalScale, animDuration);
                     break;
             }
         }
 
-        /// <summary>
-        /// Hàm public để các hệ thống khác (như Rack) có thể yêu cầu Tile đè lên trên các Tile khác
-        /// </summary>
         public void SetSortingOrder(int baseOrder)
         {
             if (baseRenderer != null) baseRenderer.sortingOrder = baseOrder;
             if (iconRenderer != null) iconRenderer.sortingOrder = baseOrder + 1;
         }
 
+        private void OnMouseEnter()
+        {
+            if (State == TileState.Exposed)
+            {
+                PlayScaleAnim(_originalScale * hoverScale, animDuration);
+            }
+        }
+
+        private void OnMouseExit()
+        {
+            if (State == TileState.Exposed)
+            {
+                PlayScaleAnim(_originalScale, animDuration);
+            }
+        }
+
         private void OnMouseDown()
         {
             if (State == TileState.Exposed)
             {
+                if (tapClip != null && _sfxManager != null) _sfxManager.Play(tapClip, 1f);
+                PlayScaleAnim(_originalScale * tapScale, animDuration * 0.5f);
                 OnTileClicked?.Invoke(this);
             }
+        }
+
+        private void PlayScaleAnim(Vector3 targetScale, float duration)
+        {
+            if (_scaleMotion.IsActive()) _scaleMotion.Cancel();
+
+            _scaleMotion = LMotion.Create(transform.localScale, targetScale, duration)
+                .WithEase(Ease.OutQuad)
+                .BindToLocalScale(transform);
+        }
+
+        private void OnDisable()
+        {
+            if (_scaleMotion.IsActive()) _scaleMotion.Cancel();
         }
     }
 }
