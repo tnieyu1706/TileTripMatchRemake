@@ -14,9 +14,6 @@ namespace Game.Core.Gameplay
 
         [Header("Managers")] [SerializeField] private SfxManager sfxManager; // Khai báo SfxManager
 
-        [Header("Data (SOAP)")] [SerializeField]
-        private PlayerDataSoap playerData;
-
         public void InstallBindings(ContainerBuilder builder)
         {
             builder.RegisterValue(boardController);
@@ -31,15 +28,6 @@ namespace Game.Core.Gameplay
             else
             {
                 Debug.LogWarning("Chưa gán SfxManager vào GameplayInstaller!");
-            }
-
-            if (playerData != null)
-            {
-                builder.RegisterValue(playerData);
-            }
-            else
-            {
-                Debug.LogError("Chưa gán PlayerDataSoap vào GameplayInstaller!");
             }
         }
     }
