@@ -1104,6 +1104,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0d7c88e61cfb82b4da624a52e562ea95, type: 2}
   - {fileID: 11400000, guid: 79699558c4bb8a0429cfa48b1e1959fa, type: 2}
   - {fileID: 11400000, guid: 326386e61dd14dd42a9c5d8cb9ea9c0e, type: 2}
+  homeSceneGroup: {fileID: 11400000, guid: d28d915813e260b4db2131889433c979, type: 2}
 --- !u!4 &674893112
 Transform:
   m_ObjectHideFlags: 0

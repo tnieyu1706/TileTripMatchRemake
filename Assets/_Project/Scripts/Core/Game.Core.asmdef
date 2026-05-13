@@ -1,7 +1,15 @@
 {
     "name": "Game.Core",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "Reflex",
+        "UniTask",
+        "EditorAttributes",
+        "LitMotion",
+        "LitMotion.Extensions",
+        "Eflatun.SceneReference",
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

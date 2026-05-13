@@ -1,20 +1,23 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using Reflex.Attributes;
-using Game.Core.Data; // Nơi chứa PlayerDataSoap
+using Game.Core.Data;
+using SceneManagement; // Thư viện Scene Management của bạn
 
 namespace Game.Core.Gameplay
 {
     public class GameManager : MonoBehaviour
     {
         [Header("Level Progression")] [SerializeField]
-        private List<LevelDataSo> levelList; // Bỏ 10 levels của bạn vào đây
+        private List<LevelDataSo> levelList;
+
+        [Header("Scene Management")] [SerializeField]
+        private SceneGroup homeSceneGroup; // Dùng SceneGroup thay cho chuỗi text
 
         private BoardController _boardController;
         private RackController _rackController;
-        private PlayerDataSoap _playerData; // Data lưu Level hiện tại
+        private PlayerDataSoap _playerData;
 
         private int _currentLevelIndex = 0;
 
@@ -46,7 +49,7 @@ namespace Game.Core.Gameplay
             }
             else
             {
-                Debug.LogError("GameManager: Chưa có LevelDataSo nào trong levelList!");
+                Debug.LogError("[GameManager] Chưa có LevelDataSo nào trong levelList!");
             }
         }
 
@@ -64,12 +67,14 @@ namespace Game.Core.Gameplay
             if (index < 0 || index >= levelList.Count) return;
 
             _currentLevelIndex = index;
-            // Chỉ cần quăng Data cho BoardController, phần còn lại Board tự lo
+            // Quăng Data cho BoardController, phần còn lại Board tự lo
             _boardController.InitializeBoard(levelList[_currentLevelIndex]);
         }
 
         public void RestartCurrentLevel()
         {
+            // Restart level hiện tại không cần Load lại Scene, 
+            // chỉ cần xoá Board cũ và setup Board mới -> Cực kỳ tối ưu!
             LoadLevelByIndex(_currentLevelIndex);
         }
 
@@ -85,14 +90,23 @@ namespace Game.Core.Gameplay
             }
             else
             {
-                Debug.Log("Chúc mừng! Bạn đã hoàn thành toàn bộ 10 Levels.");
+                Debug.Log("Chúc mừng! Bạn đã hoàn thành toàn bộ Levels.");
                 ReturnToHomeScene();
             }
         }
 
         public void ReturnToHomeScene()
         {
-            SceneManager.LoadScene("HomeScene");
+            // Sử dụng SceneLoader và SceneGroup để chuyển về Home kèm Fade Out mượt mà
+            if (homeSceneGroup != null)
+            {
+                SceneLoader.Instance.Load(homeSceneGroup);
+            }
+            else
+            {
+                Debug.LogError(
+                    "[GameManager] Chưa gán homeSceneGroup! Vui lòng kéo thả file SceneGroup vào Inspector.");
+            }
         }
 
         private void HandleWinCondition()
